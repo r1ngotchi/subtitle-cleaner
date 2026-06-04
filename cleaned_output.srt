@@ -1,0 +1,11 @@
+1
+00:00:01,000 –> 00:00:04,000
+Welcome back to the channel.
+
+2
+00:00:04,100 –> 00:00:08,000
+Today we're testing the subtitle cleaner.
+
+3
+00:00:08,100 –> 00:00:11,000
+Hopefully this saves editors time.
