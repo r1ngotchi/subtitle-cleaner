@@ -5,6 +5,8 @@ import os
 
 def clean_text(text: str) -> str:
     """Cleans a raw block of text by removing filler words and case-insensitive duplicates."""
+    # Normalize curly apostrophes
+    text = text.replace("’", "'")
     # Deduplicate case-insensitively (e.g. "We're we're" -> "We're", "the the" -> "the")
     text = re.sub(r'\b([\w\']+)(?:\s+\1\b)+', lambda m: m.group(1), text, flags=re.IGNORECASE)
     
@@ -64,7 +66,7 @@ def clean_subtitle_content(content: str) -> str:
         lines = block.split('\n')
         timestamp_idx = -1
         for idx, line in enumerate(lines):
-            if '-->' in line:
+            if '-->' in line or '–>' in line or '->' in line:
                 timestamp_idx = idx
                 break
                 
@@ -102,7 +104,7 @@ def main():
             content = f.read()
             
         # Detect if it's a subtitle file or standard text
-        is_sub = "-->" in content
+        is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
             cleaned = clean_subtitle_content(content)
         else:
@@ -128,7 +130,7 @@ def main():
         if not content.strip():
             sys.exit(0)
             
-        is_sub = "-->" in content
+        is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
             cleaned = clean_subtitle_content(content)
         else:
