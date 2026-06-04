@@ -5,7 +5,7 @@ print("=== Subtitle Cleaner v0.1 ===")
 text = input("Paste subtitle text: ")
 
 # remove repeated words
-text = re.sub(r'\b(\w+)( \1\b)+', r'\1', text)
+text = re.sub(r"\b([\w']+)( \1\b)+", r'\1', text)
 
 # remove filler words
 fillers = ["um", "uh", "like"]
