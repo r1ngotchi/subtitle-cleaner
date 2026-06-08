@@ -30,10 +30,11 @@ AI-generated subtitles save time initially but create massive cleanup debt after
 * [x] Case-insensitive duplicate word removal
 * [x] Resilient timing arrow parsing (supports `-->`, `–>`, `->`)
 * [x] Filler word & punctuation correction
-* [ ] Subtitle validation & syntax repair
-* [ ] Index sequence numbering correction
-* [ ] Malformed timestamp recovery
-* [ ] Line balancing & whitespace normalization
+* [x] Subtitle validation & syntax repair
+* [x] Index sequence numbering correction
+* [x] Malformed timestamp recovery
+* [x] Line balancing & whitespace normalization
+* [x] Non-destructive repair previews (diff mode)
 
 ### Stage 2 — Readability Engine
 * [ ] Phrase-aware line breaking (semantic segmentation)

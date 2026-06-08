@@ -2,6 +2,7 @@ import re
 import sys
 import argparse
 import os
+import difflib
 
 def clean_text(text: str) -> str:
     """Cleans a raw block of text by removing filler words and case-insensitive duplicates."""
@@ -52,11 +53,52 @@ def clean_text(text: str) -> str:
             
     return '\n'.join(cleaned_lines)
 
+def normalize_timestamp(time_str: str, is_vtt: bool = False) -> str:
+    """Standardizes, pads, and corrects malformed timestamps."""
+    time_str = time_str.strip()
+    # Replace common wrong separators before milliseconds
+    time_str = re.sub(r'[:;,.](\d{1,3})$', lambda m: ('.' if is_vtt else ',') + m.group(1), time_str)
+    
+    # Match HH:MM:SS (optional milliseconds)
+    match = re.match(r'^(\d+):(\d+):(\d+)(?:[.,](\d+))?$', time_str)
+    if match:
+        h, m, s, ms = match.groups()
+        ms = ms or '000'
+        ms = f"{ms[:3]:0<3}"
+        return f"{int(h):02d}:{int(m):02d}:{int(s):02d}" + ('.' if is_vtt else ',') + ms
+    
+    # Match MM:SS (optional milliseconds)
+    match_short = re.match(r'^(\d+):(\d+)(?:[.,](\d+))?$', time_str)
+    if match_short:
+        m, s, ms = match_short.groups()
+        ms = ms or '000'
+        ms = f"{ms[:3]:0<3}"
+        if is_vtt:
+            return f"{int(m):02d}:{int(s):02d}.{ms}"
+        else:
+            return f"00:{int(m):02d}:{int(s):02d},{ms}"
+            
+    return time_str
+
 def clean_subtitle_content(content: str) -> str:
-    """Splits file into blocks, detects timing lines, and cleans only text segments."""
+    """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
+    
+    # Preprocess: remove blank lines immediately following a timestamp line
+    content = re.sub(r'(\n[^\n]*(?:-->|–>|->)[^\n]*)\n+', r'\1\n', content)
+    # Preprocess: remove blank lines between an index number and a timestamp
+    content = re.sub(r'(\n\d+)\n+(\d+:\d+:|\d+:\d+\.)', r'\1\n\2', content)
+    
+    # Clean tabs and trailing whitespace line by line
+    lines = [line.replace('\t', ' ').rstrip() for line in content.split('\n')]
+    content = '\n'.join(lines)
+    
+    is_vtt = content.strip().startswith('WEBVTT')
     blocks = content.split('\n\n')
     cleaned_blocks = []
+    
+    expected_index = 1
+    arrow_pattern = re.compile(r'(-->|–>|->)')
     
     for block in blocks:
         block_stripped = block.strip()
@@ -66,7 +108,7 @@ def clean_subtitle_content(content: str) -> str:
         lines = block.split('\n')
         timestamp_idx = -1
         for idx, line in enumerate(lines):
-            if '-->' in line or '–>' in line or '->' in line:
+            if arrow_pattern.search(line):
                 timestamp_idx = idx
                 break
                 
@@ -74,6 +116,26 @@ def clean_subtitle_content(content: str) -> str:
             pre_timestamp = lines[:timestamp_idx]
             timestamp_line = lines[timestamp_idx]
             text_lines = lines[timestamp_idx+1:]
+            
+            # Normalize timestamp line
+            arrow_match = arrow_pattern.search(timestamp_line)
+            arrow = arrow_match.group(1)
+            parts = timestamp_line.split(arrow)
+            if len(parts) == 2:
+                start_ts = normalize_timestamp(parts[0], is_vtt)
+                end_ts = normalize_timestamp(parts[1], is_vtt)
+                timestamp_line = f"{start_ts} --> {end_ts}"
+            
+            # Correct index sequence
+            if pre_timestamp:
+                last_pre = pre_timestamp[-1].strip()
+                if last_pre.isdigit() or not last_pre:
+                    pre_timestamp[-1] = str(expected_index)
+                    expected_index += 1
+            else:
+                if not is_vtt:
+                    pre_timestamp = [str(expected_index)]
+                    expected_index += 1
             
             cleaned_text = clean_text('\n'.join(text_lines))
             
@@ -88,10 +150,39 @@ def clean_subtitle_content(content: str) -> str:
             
     return '\n\n'.join(cleaned_blocks)
 
+def print_preview(original: str, cleaned: str):
+    """Compares original and cleaned content line-by-line and prints a colored unified diff."""
+    diff_lines = list(difflib.unified_diff(
+        original.replace('\r\n', '\n').splitlines(),
+        cleaned.replace('\r\n', '\n').splitlines(),
+        fromfile='Original',
+        tofile='Cleaned',
+        lineterm=''
+    ))
+    
+    if not diff_lines:
+        print("No issues detected. Subtitle file is already clean.")
+        return
+        
+    print("=== Subtitle Repair Preview ===")
+    print("Showing proposed changes (non-destructive review):\n")
+    for line in diff_lines:
+        if line.startswith('---') or line.startswith('+++'):
+            continue
+        elif line.startswith('-'):
+            print(f"\033[91m{line}\033[0m" if sys.stdout.isatty() else line)
+        elif line.startswith('+'):
+            print(f"\033[92m{line}\033[0m" if sys.stdout.isatty() else line)
+        elif line.startswith('@@'):
+            print(f"\033[36m{line}\033[0m" if sys.stdout.isatty() else line)
+        else:
+            print(line)
+
 def main():
     parser = argparse.ArgumentParser(description="Subtitle Cleaner - Removes duplicates & filler words.")
     parser.add_argument("-i", "--input", help="Path to input subtitle/text file. If omitted, reads from interactive prompt.")
     parser.add_argument("-o", "--output", help="Path to save the cleaned file. If omitted, prints to standard output.")
+    parser.add_argument("-p", "--preview", action="store_true", help="Generate a non-destructive preview of repairs (diff) without saving.")
     
     args = parser.parse_args()
     
@@ -109,6 +200,10 @@ def main():
             cleaned = clean_subtitle_content(content)
         else:
             cleaned = clean_text(content)
+            
+        if args.preview:
+            print_preview(content, cleaned)
+            sys.exit(0)
             
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:
@@ -135,6 +230,10 @@ def main():
             cleaned = clean_subtitle_content(content)
         else:
             cleaned = clean_text(content)
+            
+        if args.preview:
+            print_preview(content, cleaned)
+            sys.exit(0)
             
         print("\n=== Cleaned Output ===\n")
         print(cleaned)

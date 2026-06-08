@@ -56,5 +56,39 @@ Yeah, we're going to build this.
 Absolutely."""
         self.assertEqual(clean_subtitle_content(vtt_input), expected_output)
 
+    def test_clean_corrupt_srt(self):
+        corrupt_input = """1
+00:00:01,000 -> 00:00:03,000
+Welcome welcome back back to to the channel.
+
+1
+00:00:03,100 --> 00:00:06,000
+\tThis subtitle block has bad spacing.
+
+3
+00:00:05,500 --> 00:00:08,000
+This subtitle overlaps with the previous one.
+
+5
+00:00:09,000 –> 00:00:11,000
+This subtitle uses a malformed unicode arrow."""
+
+        expected_output = """1
+00:00:01,000 --> 00:00:03,000
+Welcome back to the channel.
+
+2
+00:00:03,100 --> 00:00:06,000
+This subtitle block has bad spacing.
+
+3
+00:00:05,500 --> 00:00:08,000
+This subtitle overlaps with the previous one.
+
+4
+00:00:09,000 --> 00:00:11,000
+This subtitle uses a malformed unicode arrow."""
+        self.assertEqual(clean_subtitle_content(corrupt_input), expected_output)
+
 if __name__ == "__main__":
     unittest.main()

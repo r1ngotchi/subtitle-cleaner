@@ -1,11 +1,15 @@
 1
-00:00:01,000 –> 00:00:04,000
+00:00:01,000 --> 00:00:03,000
 Welcome back to the channel.
 
 2
-00:00:04,100 –> 00:00:08,000
-Today we're testing the subtitle cleaner.
+00:00:03,100 --> 00:00:06,000
+This subtitle block has bad spacing.
 
 3
-00:00:08,100 –> 00:00:11,000
-Hopefully this saves editors time.
+00:00:05,500 --> 00:00:08,000
+This subtitle overlaps with the previous one.
+
+4
+00:00:09,000 --> 00:00:11,000
+This subtitle uses a malformed unicode arrow.
