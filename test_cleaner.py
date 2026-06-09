@@ -240,5 +240,37 @@ We wanted to go
 to the grocery store today"""
         self.assertEqual(clean_subtitle_content(srt_input, nle='premiere'), expected_premiere)
 
+    def test_youtube_pipeline(self):
+        import unittest.mock as mock
+        import youtube_sync
+        import tempfile
+        import os
+        
+        mock_vtt = """WEBVTT
+
+1
+00:00:01.000 --> 00:00:04.000
+Welcome welcome back back to to the channel.
+"""
+        def mock_download(url, prefix):
+            path = f"{prefix}_xyz.en.vtt"
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(mock_vtt)
+            return path
+            
+        with mock.patch("youtube_sync.download_youtube_subs", side_effect=mock_download):
+            temp_out = tempfile.mktemp(suffix=".vtt")
+            try:
+                with mock.patch("sys.argv", ["youtube_sync.py", "https://youtube.com/watch?v=xyz", "-o", temp_out]):
+                    youtube_sync.main()
+                
+                self.assertTrue(os.path.exists(temp_out))
+                with open(temp_out, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    self.assertIn("Welcome back to the channel.", content)
+            finally:
+                if os.path.exists(temp_out):
+                    os.remove(temp_out)
+
 if __name__ == "__main__":
     unittest.main()
