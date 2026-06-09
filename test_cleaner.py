@@ -90,5 +90,17 @@ This subtitle overlaps with the previous one.
 This subtitle uses a malformed unicode arrow."""
         self.assertEqual(clean_subtitle_content(corrupt_input), expected_output)
 
+    def test_reading_speed_detector(self):
+        from diagnostics import run_diagnostics
+        # 20 characters in 0.2s = 100 CPS (extremely high)
+        srt_input = """1
+00:00:01,000 --> 00:00:01,200
+Supercalifragilistic"""
+        findings = run_diagnostics(srt_input)
+        speed_findings = [f for f in findings if f['type'] == 'reading_speed']
+        self.assertTrue(len(speed_findings) > 0)
+        self.assertEqual(speed_findings[0]['severity'], 'HIGH')
+        self.assertIn("High reading speed", speed_findings[0]['message'])
+
 if __name__ == "__main__":
     unittest.main()

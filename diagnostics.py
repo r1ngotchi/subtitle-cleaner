@@ -7,7 +7,8 @@ DETECTOR_MODULES = [
     "detectors.duplicate_indices",
     "detectors.broken_arrows",
     "detectors.timing_overlap",
-    "detectors.whitespace_corruption"
+    "detectors.whitespace_corruption",
+    "detectors.reading_speed"
 ]
 
 def run_diagnostics(content: str) -> list[dict]:
