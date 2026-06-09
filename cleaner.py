@@ -80,7 +80,48 @@ def normalize_timestamp(time_str: str, is_vtt: bool = False) -> str:
             
     return time_str
 
-def clean_subtitle_content(content: str) -> str:
+def split_line_semantically(text: str, max_width: int = 40) -> str:
+    """Splits a single long line of text into two balanced, grammatically sensible lines."""
+    text = text.strip()
+    if len(text) <= max_width:
+        return text
+        
+    spaces = [m.start() for m in re.finditer(r'\s+', text)]
+    if not spaces:
+        return text
+        
+    middle = len(text) / 2.0
+    best_idx = spaces[0]
+    best_score = float('inf')
+    
+    conjunctions = {'and', 'but', 'or', 'because', 'so', 'yet', 'for', 'nor'}
+    prepositions = {'to', 'for', 'in', 'on', 'at', 'with', 'by', 'from', 'of', 'about'}
+    
+    for space_idx in spaces:
+        dist = abs(space_idx - middle)
+        dist_penalty = (dist / middle) * 2.0
+        
+        bonus = 0.0
+        if space_idx > 0 and text[space_idx - 1] in {',', '.', '?', '!', ';', ':'}:
+            bonus += 1.5
+            
+        next_part = text[space_idx + 1:].strip()
+        if next_part:
+            next_word = re.split(r'\s+', next_part)[0].lower()
+            next_word_clean = re.sub(r'[^\w\']', '', next_word)
+            if next_word_clean in conjunctions:
+                bonus += 1.2
+            elif next_word_clean in prepositions:
+                bonus += 0.6
+                
+        score = dist_penalty - bonus
+        if score < best_score:
+            best_score = score
+            best_idx = space_idx
+            
+    return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
+
+def clean_subtitle_content(content: str, segment: bool = False) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -139,6 +180,16 @@ def clean_subtitle_content(content: str) -> str:
             
             cleaned_text = clean_text('\n'.join(text_lines))
             
+            if segment:
+                split_lines = cleaned_text.split('\n')
+                segmented_lines = []
+                for line in split_lines:
+                    if len(line) > 40:
+                        segmented_lines.append(split_line_semantically(line, 40))
+                    else:
+                        segmented_lines.append(line)
+                cleaned_text = '\n'.join(segmented_lines)
+            
             reconstructed_lines = pre_timestamp + [timestamp_line]
             if cleaned_text:
                 reconstructed_lines.append(cleaned_text)
@@ -183,6 +234,7 @@ def main():
     parser.add_argument("-i", "--input", help="Path to input subtitle/text file. If omitted, reads from interactive prompt.")
     parser.add_argument("-o", "--output", help="Path to save the cleaned file. If omitted, prints to standard output.")
     parser.add_argument("-p", "--preview", action="store_true", help="Generate a non-destructive preview of repairs (diff) without saving.")
+    parser.add_argument("-s", "--segment", action="store_true", help="Automatically segment long subtitle lines semantically based on grammatical cues.")
     
     args = parser.parse_args()
     
@@ -197,7 +249,7 @@ def main():
         # Detect if it's a subtitle file or standard text
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content)
+            cleaned = clean_subtitle_content(content, segment=args.segment)
         else:
             cleaned = clean_text(content)
             
@@ -227,7 +279,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content)
+            cleaned = clean_subtitle_content(content, segment=args.segment)
         else:
             cleaned = clean_text(content)
             

@@ -102,5 +102,12 @@ Supercalifragilistic"""
         self.assertEqual(speed_findings[0]['severity'], 'HIGH')
         self.assertIn("High reading speed", speed_findings[0]['message'])
 
+    def test_semantic_segmentation(self):
+        from cleaner import split_line_semantically
+        # Length: 46 characters. Splits at the conjunction "and"
+        long_line = "We wanted to go to the store and buy some milk"
+        expected = "We wanted to go to the store\nand buy some milk"
+        self.assertEqual(split_line_semantically(long_line, 40), expected)
+
 if __name__ == "__main__":
     unittest.main()
