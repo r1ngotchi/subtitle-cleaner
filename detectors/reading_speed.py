@@ -54,6 +54,16 @@ def detect(content: str) -> list[dict]:
                                 "line": timing_line_num,
                                 "message": f"High reading speed: {cps:.1f} characters/sec (Max recommended: {MAX_CPS:.1f} CPS). Block has {char_count} chars in {duration_s:.2f}s."
                             })
+                        
+                        # Mobile pacing checks
+                        non_empty_text_lines = [l for l in text_lines if l.strip()]
+                        if len(non_empty_text_lines) >= 2 and duration_s < 1.5:
+                            issues.append({
+                                "severity": "MEDIUM",
+                                "type": "reading_speed",
+                                "line": timing_line_num,
+                                "message": f"Pacing issue (mobile readability): Block contains {len(non_empty_text_lines)} lines of text but duration is only {duration_s:.2f}s (Min recommended for 2 lines: 1.50s)."
+                            })
                 except Exception:
                     pass
                     

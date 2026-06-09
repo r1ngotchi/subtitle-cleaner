@@ -109,5 +109,33 @@ Supercalifragilistic"""
         expected = "We wanted to go to the store\nand buy some milk"
         self.assertEqual(split_line_semantically(long_line, 40), expected)
 
+    def test_mobile_readability_segmentation(self):
+        # Length of text line is 35 characters (exceeds mobile limit 30, but fits desktop limit 40)
+        srt_input = """1
+00:00:01,000 --> 00:00:05,000
+This is a long sentence for mobile"""
+        
+        # Segment off (or desktop limit): no change
+        self.assertEqual(clean_subtitle_content(srt_input, segment=True, mobile=False), srt_input)
+        
+        # Segment on with mobile: split semantically
+        expected_mobile = """1
+00:00:01,000 --> 00:00:05,000
+This is a long sentence
+for mobile"""
+        self.assertEqual(clean_subtitle_content(srt_input, segment=True, mobile=True), expected_mobile)
+
+    def test_mobile_pacing_warning(self):
+        from diagnostics import run_diagnostics
+        # 2 lines of text, duration is 1.0 second (less than 1.5s limit)
+        srt_input = """1
+00:00:01,000 --> 00:00:02,000
+First short line
+Second short line"""
+        findings = run_diagnostics(srt_input)
+        speed_findings = [f for f in findings if f['type'] == 'reading_speed' and 'Pacing issue' in f['message']]
+        self.assertTrue(len(speed_findings) > 0)
+        self.assertEqual(speed_findings[0]['severity'], 'MEDIUM')
+
 if __name__ == "__main__":
     unittest.main()

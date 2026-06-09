@@ -121,7 +121,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -181,11 +181,12 @@ def clean_subtitle_content(content: str, segment: bool = False) -> str:
             cleaned_text = clean_text('\n'.join(text_lines))
             
             if segment:
+                max_width = 30 if mobile else 40
                 split_lines = cleaned_text.split('\n')
                 segmented_lines = []
                 for line in split_lines:
-                    if len(line) > 40:
-                        segmented_lines.append(split_line_semantically(line, 40))
+                    if len(line) > max_width:
+                        segmented_lines.append(split_line_semantically(line, max_width))
                     else:
                         segmented_lines.append(line)
                 cleaned_text = '\n'.join(segmented_lines)
@@ -235,6 +236,7 @@ def main():
     parser.add_argument("-o", "--output", help="Path to save the cleaned file. If omitted, prints to standard output.")
     parser.add_argument("-p", "--preview", action="store_true", help="Generate a non-destructive preview of repairs (diff) without saving.")
     parser.add_argument("-s", "--segment", action="store_true", help="Automatically segment long subtitle lines semantically based on grammatical cues.")
+    parser.add_argument("-m", "--mobile", action="store_true", help="Optimize subtitle line breaking width for mobile/vertical screens (max width: 30 chars).")
     
     args = parser.parse_args()
     
@@ -249,7 +251,7 @@ def main():
         # Detect if it's a subtitle file or standard text
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile)
         else:
             cleaned = clean_text(content)
             
@@ -279,7 +281,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile)
         else:
             cleaned = clean_text(content)
             
