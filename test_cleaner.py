@@ -159,5 +159,48 @@ We are using open eye and antigravity."""
 We are using OpenAI and Antigravity."""
         self.assertEqual(clean_subtitle_content(srt_input, vocab_map=vocab_map), expected)
 
+    def test_batch_directory_processing(self):
+        import tempfile
+        import shutil
+        import subprocess
+        import os
+        import sys
+        
+        # Create temp input and output directories
+        temp_in = tempfile.mkdtemp()
+        temp_out = tempfile.mkdtemp()
+        try:
+            # Write mock files to input directory, including nested
+            srt1 = os.path.join(temp_in, "sub1.srt")
+            with open(srt1, "w", encoding="utf-8") as f:
+                f.write("1\n00:00:01,000 -> 00:00:03,000\nWelcome welcome.")
+            
+            srt2 = os.path.join(temp_in, "nested", "sub2.srt")
+            os.makedirs(os.path.dirname(srt2), exist_ok=True)
+            with open(srt2, "w", encoding="utf-8") as f:
+                f.write("1\n00:00:04,000 -> 00:00:06,000\nHello hello.")
+                
+            # Execute CLI batch run in a subprocess
+            subprocess.run(
+                [sys.executable, "cleaner.py", "-i", temp_in, "-o", temp_out],
+                capture_output=True,
+                text=True
+            )
+            
+            # Check output files exist and maintain structure
+            out_sub1 = os.path.join(temp_out, "sub1.srt")
+            out_sub2 = os.path.join(temp_out, "nested", "sub2.srt")
+            
+            self.assertTrue(os.path.exists(out_sub1))
+            self.assertTrue(os.path.exists(out_sub2))
+            
+            with open(out_sub1, "r", encoding="utf-8") as f:
+                content1 = f.read()
+                self.assertIn("00:00:01,000 --> 00:00:03,000", content1)
+                self.assertIn("Welcome.", content1)
+        finally:
+            shutil.rmtree(temp_in)
+            shutil.rmtree(temp_out)
+
 if __name__ == "__main__":
     unittest.main()

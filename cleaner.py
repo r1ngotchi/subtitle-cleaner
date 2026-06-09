@@ -267,31 +267,78 @@ def main():
     
     if args.input:
         if not os.path.exists(args.input):
-            print(f"Error: File not found: {args.input}", file=sys.stderr)
+            print(f"Error: Path not found: {args.input}", file=sys.stderr)
             sys.exit(1)
             
-        with open(args.input, "r", encoding="utf-8") as f:
-            content = f.read()
+        if os.path.isdir(args.input):
+            # Batch directory processing
+            print(f"Batch processing directory: {args.input}")
+            files_to_process = []
+            for root, dirs, files in os.walk(args.input):
+                for file in files:
+                    if file.lower().endswith(('.srt', '.vtt')):
+                        files_to_process.append(os.path.join(root, file))
+                        
+            if not files_to_process:
+                print("No .srt or .vtt subtitle files found in the directory.")
+                sys.exit(0)
+                
+            print(f"Found {len(files_to_process)} file(s) to process.\n")
             
-        # Detect if it's a subtitle file or standard text
-        is_sub = "-->" in content or "–>" in content or "->" in content
-        if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
-        else:
-            cleaned = clean_text(content, vocab_map=vocab_map)
-            
-        if args.preview:
-            print_preview(content, cleaned)
+            for file_path in files_to_process:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
+                
+                if args.preview:
+                    print(f"\n--- Preview: {file_path} ---")
+                    print_preview(content, cleaned)
+                    continue
+                    
+                # Determine output path
+                if args.output:
+                    rel_path = os.path.relpath(file_path, args.input)
+                    out_path = os.path.join(args.output, rel_path)
+                    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+                else:
+                    base, ext = os.path.splitext(file_path)
+                    out_path = f"{base}_cleaned{ext}"
+                    
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(cleaned)
+                    if not cleaned.endswith('\n'):
+                        f.write('\n')
+                print(f"Cleaned and saved: {out_path}")
             sys.exit(0)
             
-        if args.output:
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(cleaned)
-                if not cleaned.endswith('\n'):
-                    f.write('\n')
-            print(f"Successfully cleaned and saved to {args.output}")
         else:
-            print(cleaned)
+            # Single file processing
+            with open(args.input, "r", encoding="utf-8") as f:
+                content = f.read()
+                
+            is_sub = "-->" in content or "–>" in content or "->" in content
+            if is_sub:
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
+            else:
+                cleaned = clean_text(content, vocab_map=vocab_map)
+                
+            if args.preview:
+                print_preview(content, cleaned)
+                sys.exit(0)
+                
+            if args.output:
+                if os.path.isdir(args.output):
+                    out_path = os.path.join(args.output, os.path.basename(args.input))
+                else:
+                    out_path = args.output
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(cleaned)
+                    if not cleaned.endswith('\n'):
+                        f.write('\n')
+                print(f"Successfully cleaned and saved to {out_path}")
+            else:
+                print(cleaned)
     else:
         # Fall back to interactive CLI prompt
         print("=== Subtitle Cleaner v0.2 ===")
