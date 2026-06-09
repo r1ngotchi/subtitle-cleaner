@@ -4,10 +4,21 @@ import argparse
 import os
 import difflib
 
-def clean_text(text: str) -> str:
+def apply_vocab_map(text: str, vocab_map: dict) -> str:
+    """Applies custom vocabulary mapping using safe word boundary regexes."""
+    if not vocab_map:
+        return text
+    for typo, correction in vocab_map.items():
+        escaped_typo = re.escape(typo)
+        text = re.sub(r'\b' + escaped_typo + r'\b', correction, text, flags=re.IGNORECASE)
+    return text
+
+def clean_text(text: str, vocab_map: dict = None) -> str:
     """Cleans a raw block of text by removing filler words and case-insensitive duplicates."""
     # Normalize curly apostrophes
     text = text.replace("’", "'")
+    if vocab_map:
+        text = apply_vocab_map(text, vocab_map)
     # Deduplicate case-insensitively (e.g. "We're we're" -> "We're", "the the" -> "the")
     text = re.sub(r'\b([\w\']+)(?:\s+\1\b)+', lambda m: m.group(1), text, flags=re.IGNORECASE)
     
@@ -121,7 +132,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -178,7 +189,7 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
                     pre_timestamp = [str(expected_index)]
                     expected_index += 1
             
-            cleaned_text = clean_text('\n'.join(text_lines))
+            cleaned_text = clean_text('\n'.join(text_lines), vocab_map=vocab_map)
             
             if segment:
                 max_width = 30 if mobile else 40
@@ -237,8 +248,22 @@ def main():
     parser.add_argument("-p", "--preview", action="store_true", help="Generate a non-destructive preview of repairs (diff) without saving.")
     parser.add_argument("-s", "--segment", action="store_true", help="Automatically segment long subtitle lines semantically based on grammatical cues.")
     parser.add_argument("-m", "--mobile", action="store_true", help="Optimize subtitle line breaking width for mobile/vertical screens (max width: 30 chars).")
+    parser.add_argument("-v", "--vocab", help="Path to JSON-based vocabulary mapping file for custom search-and-replace corrections.")
     
     args = parser.parse_args()
+    
+    vocab_map = None
+    if args.vocab:
+        if not os.path.exists(args.vocab):
+            print(f"Error: Vocab file not found: {args.vocab}", file=sys.stderr)
+            sys.exit(1)
+        import json
+        with open(args.vocab, 'r', encoding='utf-8') as f:
+            try:
+                vocab_map = json.load(f)
+            except Exception as e:
+                print(f"Error: Failed to parse vocab JSON: {e}", file=sys.stderr)
+                sys.exit(1)
     
     if args.input:
         if not os.path.exists(args.input):
@@ -251,9 +276,9 @@ def main():
         # Detect if it's a subtitle file or standard text
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
         else:
-            cleaned = clean_text(content)
+            cleaned = clean_text(content, vocab_map=vocab_map)
             
         if args.preview:
             print_preview(content, cleaned)
@@ -281,9 +306,9 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
         else:
-            cleaned = clean_text(content)
+            cleaned = clean_text(content, vocab_map=vocab_map)
             
         if args.preview:
             print_preview(content, cleaned)

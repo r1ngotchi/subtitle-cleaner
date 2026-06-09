@@ -137,5 +137,27 @@ Second short line"""
         self.assertTrue(len(speed_findings) > 0)
         self.assertEqual(speed_findings[0]['severity'], 'MEDIUM')
 
+    def test_vocabulary_mapping(self):
+        # Test word-boundary-aware search and replace
+        vocab_map = {
+            "open eye": "OpenAI",
+            "antigravity": "Antigravity"
+        }
+        
+        # Test basic text clean
+        self.assertEqual(clean_text("We are using open eye tech.", vocab_map), "We are using OpenAI tech.")
+        self.assertEqual(clean_text("Testing antigravity tool.", vocab_map), "Testing Antigravity tool.")
+        # Test it doesn't match parts of words (word boundary check)
+        self.assertEqual(clean_text("This is an open eyelet.", vocab_map), "This is an open eyelet.")
+        
+        # Test subtitle content clean
+        srt_input = """1
+00:00:01,000 --> 00:00:04,000
+We are using open eye and antigravity."""
+        expected = """1
+00:00:01,000 --> 00:00:04,000
+We are using OpenAI and Antigravity."""
+        self.assertEqual(clean_subtitle_content(srt_input, vocab_map=vocab_map), expected)
+
 if __name__ == "__main__":
     unittest.main()
