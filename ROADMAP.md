@@ -37,15 +37,15 @@ AI-generated subtitles save time initially but create massive cleanup debt after
 * [x] Non-destructive repair previews (diff mode)
 
 ### Stage 2 — Readability Engine
-* [ ] Phrase-aware line breaking (semantic segmentation)
-* [ ] Pacing optimization & mobile readability
-* [ ] Reading speed scoring (WPM metrics)
+* [x] Phrase-aware line breaking (semantic segmentation)
+* [x] Pacing optimization & mobile readability
+* [x] Reading speed scoring (WPM metrics)
 
 ### Stage 3 — Vocabulary System
-* [ ] Custom replacement dictionaries (JSON-based vocabulary maps)
-* [ ] Speaker-specific name & term corrections
+* [x] Custom replacement dictionaries (JSON-based vocabulary maps)
+* [x] Speaker-specific name & term corrections
 
 ### Stage 4 — Workflow Integrations
-* [ ] YouTube caption download-to-upload pipeline
-* [ ] Premiere Pro & DaVinci Resolve import optimization
-* [ ] Batch file directory processing
+* [x] YouTube caption download-to-upload pipeline
+* [x] Premiere Pro & DaVinci Resolve import optimization
+* [x] Batch file directory processing
