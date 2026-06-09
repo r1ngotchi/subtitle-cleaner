@@ -11,6 +11,10 @@ class TestSubtitleCleaner(unittest.TestCase):
         self.assertEqual(clean_text("Yeah, like, we should go."), "Yeah we should go.")
         self.assertEqual(clean_text("um, absolutely uh yes"), "Absolutely yes")
         self.assertEqual(clean_text("like, like, we're we're going"), "We're going")
+
+    def test_clean_text_tags(self):
+        self.assertEqual(clean_text("This has <font color='#ff0000'>red</font> text."), "This has red text.")
+        self.assertEqual(clean_text("This is <i>italic</i> and <b>bold</b>."), "This is italic and bold.")
         
     def test_clean_srt(self):
         srt_input = """1

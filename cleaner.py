@@ -17,6 +17,8 @@ def clean_text(text: str, vocab_map: dict = None) -> str:
     """Cleans a raw block of text by removing filler words and case-insensitive duplicates."""
     # Normalize curly apostrophes
     text = text.replace("’", "'")
+    # Strip HTML/font formatting tags (e.g., <font color="...">text</font> or <i>text</i>)
+    text = re.sub(r'<[^>]+>', '', text)
     if vocab_map:
         text = apply_vocab_map(text, vocab_map)
     # Deduplicate case-insensitively (e.g. "We're we're" -> "We're", "the the" -> "the")
