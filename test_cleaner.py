@@ -202,5 +202,43 @@ We are using OpenAI and Antigravity."""
             shutil.rmtree(temp_in)
             shutil.rmtree(temp_out)
 
+    def test_nle_compatibility_detectors(self):
+        from diagnostics import run_diagnostics
+        
+        # Test 1: Block with 3+ lines (High risk)
+        srt_input_3lines = """1
+00:00:01,000 --> 00:00:04,000
+Line one of text
+Line two of text
+Line three of text"""
+        findings = run_diagnostics(srt_input_3lines)
+        nle_findings = [f for f in findings if f['type'] == 'nle_compatibility']
+        self.assertTrue(len(nle_findings) > 0)
+        self.assertEqual(nle_findings[0]['severity'], 'HIGH')
+        self.assertIn("maximum of 2 lines", nle_findings[0]['message'])
+
+        # Test 2: Line > 37 chars (Medium risk)
+        srt_input_longline = """1
+00:00:01,000 --> 00:00:04,000
+This is a very long line that exceeds thirty seven characters in length."""
+        findings2 = run_diagnostics(srt_input_longline)
+        nle_findings2 = [f for f in findings2 if f['type'] == 'nle_compatibility']
+        self.assertTrue(len(nle_findings2) > 0)
+        self.assertEqual(nle_findings2[0]['severity'], 'MEDIUM')
+        self.assertIn("exceeds 37 characters", nle_findings2[0]['message'])
+
+    def test_nle_optimization_options(self):
+        # Test Premiere Pro 37 characters width limit reformatting
+        # 39 characters. Splits at the preposition "to"
+        srt_input = """1
+00:00:01,000 --> 00:00:04,000
+We wanted to go to the grocery store today"""
+        
+        expected_premiere = """1
+00:00:01,000 --> 00:00:04,000
+We wanted to go
+to the grocery store today"""
+        self.assertEqual(clean_subtitle_content(srt_input, nle='premiere'), expected_premiere)
+
 if __name__ == "__main__":
     unittest.main()

@@ -132,7 +132,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -191,8 +191,11 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             
             cleaned_text = clean_text('\n'.join(text_lines), vocab_map=vocab_map)
             
-            if segment:
-                max_width = 30 if mobile else 40
+            if segment or nle == 'premiere':
+                if nle == 'premiere':
+                    max_width = 37
+                else:
+                    max_width = 30 if mobile else 40
                 split_lines = cleaned_text.split('\n')
                 segmented_lines = []
                 for line in split_lines:
@@ -249,6 +252,7 @@ def main():
     parser.add_argument("-s", "--segment", action="store_true", help="Automatically segment long subtitle lines semantically based on grammatical cues.")
     parser.add_argument("-m", "--mobile", action="store_true", help="Optimize subtitle line breaking width for mobile/vertical screens (max width: 30 chars).")
     parser.add_argument("-v", "--vocab", help="Path to JSON-based vocabulary mapping file for custom search-and-replace corrections.")
+    parser.add_argument("--nle", choices=["premiere", "resolve"], help="Optimize output explicitly for Premiere Pro or DaVinci Resolve compatibility.")
     
     args = parser.parse_args()
     
@@ -289,7 +293,7 @@ def main():
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                     
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
                 
                 if args.preview:
                     print(f"\n--- Preview: {file_path} ---")
@@ -305,7 +309,8 @@ def main():
                     base, ext = os.path.splitext(file_path)
                     out_path = f"{base}_cleaned{ext}"
                     
-                with open(out_path, "w", encoding="utf-8") as f:
+                encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
+                with open(out_path, "w", encoding=encoding) as f:
                     f.write(cleaned)
                     if not cleaned.endswith('\n'):
                         f.write('\n')
@@ -319,7 +324,7 @@ def main():
                 
             is_sub = "-->" in content or "–>" in content or "->" in content
             if is_sub:
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
             else:
                 cleaned = clean_text(content, vocab_map=vocab_map)
                 
@@ -332,7 +337,8 @@ def main():
                     out_path = os.path.join(args.output, os.path.basename(args.input))
                 else:
                     out_path = args.output
-                with open(out_path, "w", encoding="utf-8") as f:
+                encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
+                with open(out_path, "w", encoding=encoding) as f:
                     f.write(cleaned)
                     if not cleaned.endswith('\n'):
                         f.write('\n')
@@ -353,7 +359,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
         else:
             cleaned = clean_text(content, vocab_map=vocab_map)
             

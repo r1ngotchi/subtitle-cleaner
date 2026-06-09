@@ -8,7 +8,8 @@ DETECTOR_MODULES = [
     "detectors.broken_arrows",
     "detectors.timing_overlap",
     "detectors.whitespace_corruption",
-    "detectors.reading_speed"
+    "detectors.reading_speed",
+    "detectors.nle_compatibility"
 ]
 
 def run_diagnostics(content: str) -> list[dict]:
