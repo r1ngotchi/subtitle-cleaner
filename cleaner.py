@@ -134,7 +134,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None, to_format: str = None) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -148,9 +148,14 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
     content = '\n'.join(lines)
     
     is_vtt = content.strip().startswith('WEBVTT')
+    target_vtt = (to_format.lower() == 'vtt') if to_format else is_vtt
+    
     blocks = content.split('\n\n')
     cleaned_blocks = []
     
+    if target_vtt and not is_vtt:
+        cleaned_blocks.append('WEBVTT')
+        
     expected_index = 1
     arrow_pattern = re.compile(r'(-->|–>|->)')
     
@@ -176,20 +181,27 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             arrow = arrow_match.group(1)
             parts = timestamp_line.split(arrow)
             if len(parts) == 2:
-                start_ts = normalize_timestamp(parts[0], is_vtt)
-                end_ts = normalize_timestamp(parts[1], is_vtt)
+                start_ts = normalize_timestamp(parts[0], target_vtt)
+                end_ts = normalize_timestamp(parts[1], target_vtt)
                 timestamp_line = f"{start_ts} --> {end_ts}"
             
             # Correct index sequence
-            if pre_timestamp:
-                last_pre = pre_timestamp[-1].strip()
-                if last_pre.isdigit() or not last_pre:
-                    pre_timestamp[-1] = str(expected_index)
-                    expected_index += 1
-            else:
-                if not is_vtt:
+            if to_format:
+                if target_vtt:
+                    pre_timestamp = []
+                else:
                     pre_timestamp = [str(expected_index)]
                     expected_index += 1
+            else:
+                if pre_timestamp:
+                    last_pre = pre_timestamp[-1].strip()
+                    if last_pre.isdigit() or not last_pre:
+                        pre_timestamp[-1] = str(expected_index)
+                        expected_index += 1
+                else:
+                    if not target_vtt:
+                        pre_timestamp = [str(expected_index)]
+                        expected_index += 1
             
             cleaned_text = clean_text('\n'.join(text_lines), vocab_map=vocab_map)
             
@@ -213,8 +225,13 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             
             cleaned_blocks.append('\n'.join(reconstructed_lines))
         else:
-            # Preserve VTT headers or metadata blocks
-            cleaned_blocks.append(block)
+            # If target is VTT and source is VTT, preserve metadata
+            if target_vtt and is_vtt:
+                # Skip duplicate WEBVTT prepends
+                if block_stripped == 'WEBVTT' and len(cleaned_blocks) > 0 and cleaned_blocks[0] == 'WEBVTT':
+                    continue
+                cleaned_blocks.append(block)
+            # If target is SRT, skip VTT headers/metadata blocks
             
     return '\n\n'.join(cleaned_blocks)
 
@@ -255,6 +272,7 @@ def main():
     parser.add_argument("-m", "--mobile", action="store_true", help="Optimize subtitle line breaking width for mobile/vertical screens (max width: 30 chars).")
     parser.add_argument("-v", "--vocab", help="Path to JSON-based vocabulary mapping file for custom search-and-replace corrections.")
     parser.add_argument("--nle", choices=["premiere", "resolve"], help="Optimize output explicitly for Premiere Pro or DaVinci Resolve compatibility.")
+    parser.add_argument("-f", "--format", choices=["srt", "vtt"], help="Force output subtitle format conversion (srt or vtt).")
     
     args = parser.parse_args()
     
@@ -295,7 +313,7 @@ def main():
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                     
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
                 
                 if args.preview:
                     print(f"\n--- Preview: {file_path} ---")
@@ -305,11 +323,14 @@ def main():
                 # Determine output path
                 if args.output:
                     rel_path = os.path.relpath(file_path, args.input)
+                    if args.format:
+                        rel_path = os.path.splitext(rel_path)[0] + f".{args.format}"
                     out_path = os.path.join(args.output, rel_path)
                     os.makedirs(os.path.dirname(out_path), exist_ok=True)
                 else:
                     base, ext = os.path.splitext(file_path)
-                    out_path = f"{base}_cleaned{ext}"
+                    target_ext = f".{args.format}" if args.format else ext
+                    out_path = f"{base}_cleaned{target_ext}"
                     
                 encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
                 with open(out_path, "w", encoding=encoding) as f:
@@ -326,7 +347,7 @@ def main():
                 
             is_sub = "-->" in content or "–>" in content or "->" in content
             if is_sub:
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
             else:
                 cleaned = clean_text(content, vocab_map=vocab_map)
                 
@@ -336,9 +357,14 @@ def main():
                 
             if args.output:
                 if os.path.isdir(args.output):
-                    out_path = os.path.join(args.output, os.path.basename(args.input))
+                    basename = os.path.basename(args.input)
+                    if args.format:
+                        basename = os.path.splitext(basename)[0] + f".{args.format}"
+                    out_path = os.path.join(args.output, basename)
                 else:
                     out_path = args.output
+                    if args.format and not out_path.endswith(f".{args.format}"):
+                        out_path = os.path.splitext(out_path)[0] + f".{args.format}"
                 encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
                 with open(out_path, "w", encoding=encoding) as f:
                     f.write(cleaned)
@@ -361,7 +387,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
         else:
             cleaned = clean_text(content, vocab_map=vocab_map)
             

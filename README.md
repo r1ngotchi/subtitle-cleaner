@@ -24,6 +24,7 @@ AI transcription tools (Whisper, CapCut, Premiere's auto-transcribe) save time u
 | **Custom vocabulary map** | `--vocab vocab.json` | JSON-based find-and-replace for brand names, jargon, speaker names |
 | **NLE optimization** | `--nle premiere\|resolve` | Premiere Pro (37-char limit, 2-line max) and Resolve (UTF-8 BOM) modes |
 | **Batch processing** | `-i /folder/ -o /out/` | Recursively processes entire directories of `.srt`/`.vtt` files |
+| **Format conversion** | `--format srt\|vtt` / `-f srt\|vtt` | Convert between SRT and VTT formats (converts timestamps & index styles) |
 | **YouTube caption sync** | `youtube_sync.py` | Downloads, cleans, and saves captions from any YouTube URL |
 
 ---
@@ -65,6 +66,12 @@ subtitle-cleaner -i messy.srt -o clean.srt --vocab my_vocab.json
 
 # Batch process an entire folder
 subtitle-cleaner -i ./subtitles/ -o ./cleaned/
+
+# Convert SRT to VTT (strips indices, normalizes dots)
+subtitle-cleaner -i input.srt -o output.vtt -f vtt
+
+# Convert VTT to SRT (restores sequential indices, normalizes commas)
+subtitle-cleaner -i input.vtt -o output.srt -f srt
 
 # Download and clean YouTube captions directly
 subtitle-youtube-sync https://www.youtube.com/watch?v=VIDEO_ID -o output.vtt

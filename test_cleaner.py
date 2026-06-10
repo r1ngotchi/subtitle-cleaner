@@ -276,5 +276,48 @@ Welcome welcome back back to to the channel.
                 if os.path.exists(temp_out):
                     os.remove(temp_out)
 
+    def test_format_conversion(self):
+        # SRT input to convert to VTT
+        srt_input = """1
+00:00:01,230 --> 00:00:04,560
+Hello world.
+
+2
+00:00:04,600 --> 00:00:06,000
+Second subtitle."""
+        
+        expected_vtt = """WEBVTT
+
+00:00:01.230 --> 00:00:04.560
+Hello world.
+
+00:00:04.600 --> 00:00:06.000
+Second subtitle."""
+        
+        # Test srt -> vtt
+        self.assertEqual(clean_subtitle_content(srt_input, to_format="vtt"), expected_vtt)
+        
+        # VTT input to convert to SRT
+        vtt_input = """WEBVTT
+Kind: captions
+Language: en
+
+00:00:01.230 --> 00:00:04.560
+Hello world.
+
+00:00:04.600 --> 00:00:06.000
+Second subtitle."""
+        
+        expected_srt = """1
+00:00:01,230 --> 00:00:04,560
+Hello world.
+
+2
+00:00:04,600 --> 00:00:06,000
+Second subtitle."""
+        
+        # Test vtt -> srt
+        self.assertEqual(clean_subtitle_content(vtt_input, to_format="srt"), expected_srt)
+
 if __name__ == "__main__":
     unittest.main()
