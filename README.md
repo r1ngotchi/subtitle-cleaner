@@ -1,38 +1,171 @@
-# Subtitle Cleaner
+# subtitle-cleaner
 
-A local-first subtitle sanitation and diagnostics toolkit.
+> **A local-first Python CLI toolkit for sanitizing, repairing, and optimizing AI-generated subtitle files.**
 
-Current capabilities:
-- subtitle cleanup
-- duplicate word removal
-- filler word cleanup
-- SRT/VTT parsing
-- corruption diagnostics
-- malformed subtitle detection
+AI transcription tools (Whisper, CapCut, Premiere's auto-transcribe) save time up front — but the cleanup afterward is brutal. Stuttered words, broken import syntax, filler noise, and ugly line breaks pile up fast.
 
-Current diagnostic categories:
-- duplicate indices
-- malformed timestamp arrows
-- timing overlap detection
-- whitespace corruption
+`subtitle-cleaner` runs **entirely on your machine** with no cloud dependencies, no privacy risk, and no subscription.
 
-Example diagnostic output:
+---
 
-text [HIGH] Broken timestamp arrow [MEDIUM] Duplicate subtitle index [LOW] Excessive whitespace corruption 
+## ✨ Features
 
-Goal:
-build trustworthy subtitle sanitation tooling focused on diagnostics, repair safety, and workflow reliability.
+| Feature | Flag | Description |
+|---------|------|-------------|
+| **Duplicate word removal** | *(default)* | Case-insensitively removes stutters (`"We're we're"` → `"We're"`) |
+| **Filler word stripping** | *(default)* | Removes `um`, `uh`, `like` without breaking timings |
+| **HTML/font tag stripping** | *(default)* | Cleans embedded `<font>`, `<i>`, `<b>` tags from SRT/VTT |
+| **Arrow & timestamp repair** | *(default)* | Normalizes unicode arrows (`–>`, `->`) to standard `-->` |
+| **Index re-sequencing** | *(default)* | Fixes out-of-order subtitle block indices starting from 1 |
+| **Timestamp normalization** | *(default)* | Pads and corrects malformed `HH:MM:SS,mmm` timestamps |
+| **Repair preview (diff)** | `--preview` / `-p` | Non-destructive diff of proposed changes before saving |
+| **Semantic line breaking** | `--segment` / `-s` | Splits long lines at grammatical boundaries (not character counts) |
+| **Mobile formatting** | `--mobile` / `-m` | 30-character line width for 9:16 vertical video (TikTok/Shorts/Reels) |
+| **Custom vocabulary map** | `--vocab vocab.json` | JSON-based find-and-replace for brand names, jargon, speaker names |
+| **NLE optimization** | `--nle premiere\|resolve` | Premiere Pro (37-char limit, 2-line max) and Resolve (UTF-8 BOM) modes |
+| **Batch processing** | `-i /folder/ -o /out/` | Recursively processes entire directories of `.srt`/`.vtt` files |
+| **YouTube caption sync** | `youtube_sync.py` | Downloads, cleans, and saves captions from any YouTube URL |
 
-## Submit Broken Subtitle Files
+---
 
-If you encounter:
+## 🚀 Quick Start
 
-* malformed subtitle exports
-* broken SRT/VTT files
-* timing corruption
-* import failures
-* subtitle formatting issues
+```bash
+# Requires Python 3.8+, no dependencies needed
+git clone https://github.com/r1ngotchi/subtitle-cleaner
+cd subtitle-cleaner
 
-please submit a GitHub issue with the subtitle file attached.
+# Preview what would change (no files modified)
+python cleaner.py -i messy.srt --preview
 
-The project is currently building a structured corruption dataset to improve subtitle diagnostics and repair reliability.
+# Clean and save
+python cleaner.py -i messy.srt -o clean.srt
+
+# Clean for Premiere Pro import (37-char line limit, 2-line max)
+python cleaner.py -i messy.srt -o clean.srt --nle premiere
+
+# Clean for DaVinci Resolve (UTF-8 BOM encoding)
+python cleaner.py -i messy.srt -o clean.srt --nle resolve
+
+# Semantic line breaking + mobile formatting
+python cleaner.py -i messy.srt -o clean.srt --segment --mobile
+
+# Apply custom vocabulary corrections
+python cleaner.py -i messy.srt -o clean.srt --vocab my_vocab.json
+
+# Batch process an entire folder
+python cleaner.py -i ./subtitles/ -o ./cleaned/
+
+# Download and clean YouTube captions
+python youtube_sync.py https://www.youtube.com/watch?v=VIDEO_ID -o output.vtt
+```
+
+---
+
+## 📋 Before / After Example
+
+**Input (`messy.srt`):**
+```
+1
+00:00:01,000 -> 00:00:04,000
+Yeah, we're we're going to like, um, build this.
+
+1
+00:00:04,100 ---> 00:00:06,000
+Like, uh, <font color="#ff0000">absolutely.</font>
+```
+
+**Output after `python cleaner.py -i messy.srt`:**
+```
+1
+00:00:01,000 --> 00:00:04,000
+Yeah, we're going to build this.
+
+2
+00:00:04,100 --> 00:00:06,000
+Absolutely.
+```
+
+---
+
+## 📦 Custom Vocabulary Map (`--vocab`)
+
+Create a `vocab.json` file mapping AI mistranscriptions to their correct forms:
+
+```json
+{
+  "open eye": "OpenAI",
+  "adobe premiere pro": "Adobe Premiere Pro",
+  "da vinci resolve": "DaVinci Resolve"
+}
+```
+
+Then run: `python cleaner.py -i messy.srt -o clean.srt --vocab vocab.json`
+
+---
+
+## 🔬 Diagnostics
+
+Run the linter to get a full report of issues before cleaning:
+
+```bash
+python diagnostics.py messy.srt
+```
+
+The linter checks for:
+- **Reading speed** — flags blocks with dangerously high CPS (characters per second)
+- **NLE compatibility** — warns about 3+ line blocks and lines >37 chars (Premiere crash risk)
+- **Timing overlaps** — detects blocks where end time > next block's start time
+- **Whitespace corruption** — tabs, trailing spaces, CRLF issues
+
+---
+
+## ⚙️ YouTube Caption Sync
+
+```bash
+# Requires yt-dlp: pip install yt-dlp
+python youtube_sync.py https://www.youtube.com/watch?v=VIDEO_ID -o captions.vtt
+```
+
+Downloads auto-generated or manually uploaded captions, cleans them, and saves a polished file ready for upload or NLE import.
+
+---
+
+## 🧪 Tests
+
+```bash
+python -m unittest test_cleaner.py
+# Expected: 15 tests, all passing
+```
+
+---
+
+## 📁 Project Structure
+
+```
+subtitle-cleaner/
+├── cleaner.py          # Core CLI tool
+├── diagnostics.py      # Linting & validation engine
+├── youtube_sync.py     # YouTube caption downloader-cleaner
+├── detectors/          # Modular lint checkers
+│   ├── reading_speed.py
+│   ├── nle_compatibility.py
+│   └── ...
+├── sample_input.srt    # Test fixture
+├── sample_vocab.json   # Example vocabulary map
+└── test_cleaner.py     # 15 unit + integration tests
+```
+
+---
+
+## 🤝 Contributing
+
+Found a subtitle file that breaks the parser? [Submit an issue](https://github.com/r1ngotchi/subtitle-cleaner/issues) and attach the file — we're building a structured corruption dataset to improve repair reliability.
+
+Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and distribute.
