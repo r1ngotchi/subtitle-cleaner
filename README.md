@@ -28,36 +28,46 @@ AI transcription tools (Whisper, CapCut, Premiere's auto-transcribe) save time u
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation
 
 ```bash
-# Requires Python 3.8+, no dependencies needed
+# Install directly from GitHub
+pip install git+https://github.com/r1ngotchi/subtitle-cleaner.git
+
+# Or clone and install in editable mode for development
 git clone https://github.com/r1ngotchi/subtitle-cleaner
 cd subtitle-cleaner
+pip install -e .
+```
 
-# Preview what would change (no files modified)
-python cleaner.py -i messy.srt --preview
+## 💻 Quick Start
 
-# Clean and save
-python cleaner.py -i messy.srt -o clean.srt
+Once installed, the toolkit provides three convenient CLI commands:
+
+```bash
+# Preview what would change (non-destructive)
+subtitle-cleaner -i messy.srt --preview
+
+# Clean and save output
+subtitle-cleaner -i messy.srt -o clean.srt
 
 # Clean for Premiere Pro import (37-char line limit, 2-line max)
-python cleaner.py -i messy.srt -o clean.srt --nle premiere
+subtitle-cleaner -i messy.srt -o clean.srt --nle premiere
 
 # Clean for DaVinci Resolve (UTF-8 BOM encoding)
-python cleaner.py -i messy.srt -o clean.srt --nle resolve
+subtitle-cleaner -i messy.srt -o clean.srt --nle resolve
 
 # Semantic line breaking + mobile formatting
-python cleaner.py -i messy.srt -o clean.srt --segment --mobile
+subtitle-cleaner -i messy.srt -o clean.srt --segment --mobile
 
 # Apply custom vocabulary corrections
-python cleaner.py -i messy.srt -o clean.srt --vocab my_vocab.json
+subtitle-cleaner -i messy.srt -o clean.srt --vocab my_vocab.json
 
 # Batch process an entire folder
-python cleaner.py -i ./subtitles/ -o ./cleaned/
+subtitle-cleaner -i ./subtitles/ -o ./cleaned/
 
-# Download and clean YouTube captions
-python youtube_sync.py https://www.youtube.com/watch?v=VIDEO_ID -o output.vtt
+# Download and clean YouTube captions directly
+subtitle-youtube-sync https://www.youtube.com/watch?v=VIDEO_ID -o output.vtt
 ```
 
 ---
@@ -109,7 +119,7 @@ Then run: `python cleaner.py -i messy.srt -o clean.srt --vocab vocab.json`
 Run the linter to get a full report of issues before cleaning:
 
 ```bash
-python diagnostics.py messy.srt
+subtitle-diagnostics messy.srt
 ```
 
 The linter checks for:
@@ -123,8 +133,7 @@ The linter checks for:
 ## ⚙️ YouTube Caption Sync
 
 ```bash
-# Requires yt-dlp: pip install yt-dlp
-python youtube_sync.py https://www.youtube.com/watch?v=VIDEO_ID -o captions.vtt
+subtitle-youtube-sync https://www.youtube.com/watch?v=VIDEO_ID -o captions.vtt
 ```
 
 Downloads auto-generated or manually uploaded captions, cleans them, and saves a polished file ready for upload or NLE import.

@@ -30,8 +30,7 @@ def run_diagnostics(content: str) -> list[dict]:
             
     return issues
 
-if __name__ == "__main__":
-    # Standard CLI test loop
+def main():
     import argparse
     parser = argparse.ArgumentParser(description="Subtitle Diagnostics Runner")
     parser.add_argument("file", help="Path to subtitle file to scan")
@@ -49,3 +48,6 @@ if __name__ == "__main__":
     print(f"Found {len(findings)} issue(s).\n")
     for issue in findings:
         print(f"[{issue['severity']}] Line {issue['line']} ({issue['type']}): {issue['message']}")
+
+if __name__ == "__main__":
+    main()
