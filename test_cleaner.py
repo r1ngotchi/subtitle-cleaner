@@ -319,5 +319,24 @@ Second subtitle."""
         # Test vtt -> srt
         self.assertEqual(clean_subtitle_content(vtt_input, to_format="srt"), expected_srt)
 
+    def test_overlap_fixing(self):
+        # 1st block ends at 5s, 2nd starts at 4.5s (overlap of 0.5s)
+        overlap_srt = """1
+00:00:01,000 --> 00:00:05,000
+This subtitle overlaps.
+
+2
+00:00:04,500 --> 00:00:07,000
+This subtitle starts too early."""
+        
+        # When fix_overlaps is False: overlap is preserved
+        cleaned_no_fix = clean_subtitle_content(overlap_srt, fix_overlaps=False)
+        self.assertIn("00:00:01,000 --> 00:00:05,000", cleaned_no_fix)
+        
+        # When fix_overlaps is True: 1st block end is trimmed to 00:00:04,499 (start of 2nd - 1ms)
+        cleaned_fixed = clean_subtitle_content(overlap_srt, fix_overlaps=True)
+        self.assertIn("00:00:01,000 --> 00:00:04,499", cleaned_fixed)
+        self.assertIn("00:00:04,500 --> 00:00:07,000", cleaned_fixed)
+
 if __name__ == "__main__":
     unittest.main()

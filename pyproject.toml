@@ -24,7 +24,8 @@ dependencies = [
 subtitle-cleaner = "cleaner:main"
 subtitle-diagnostics = "diagnostics:main"
 subtitle-youtube-sync = "youtube_sync:main"
+subtitle-regression = "regression_test:run_regression_tests"
 
 [tool.setuptools]
-py-modules = ["cleaner", "diagnostics", "youtube_sync"]
+py-modules = ["cleaner", "diagnostics", "youtube_sync", "regression_test"]
 packages = ["detectors"]

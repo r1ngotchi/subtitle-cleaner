@@ -149,9 +149,18 @@ Downloads auto-generated or manually uploaded captions, cleans them, and saves a
 
 ## 🧪 Tests
 
+### Unit Tests
+Verify individual module features and parser stability:
 ```bash
 python -m unittest test_cleaner.py
-# Expected: 15 tests, all passing
+# Expected: 17 tests, all passing
+```
+
+### Regression Tests
+Test the cleaner automatically against all collected real-world corruptions in the dataset:
+```bash
+subtitle-regression
+# Expected: Runs and passes all dataset test cases with 0 critical errors remaining
 ```
 
 ---

@@ -93,6 +93,28 @@ def normalize_timestamp(time_str: str, is_vtt: bool = False) -> str:
             
     return time_str
 
+def time_to_ms(time_str: str) -> int:
+    """Parses subtitle timing strings (HH:MM:SS,mmm or HH:MM:SS.mmm) into milliseconds."""
+    time_str = time_str.strip().replace(',', '.')
+    parts = time_str.split('.')
+    hms = parts[0].split(':')
+    hours = int(hms[0])
+    minutes = int(hms[1])
+    seconds = int(hms[2])
+    ms = int(parts[1]) if len(parts) > 1 else 0
+    return ((hours * 3600 + minutes * 60 + seconds) * 1000) + ms
+
+def ms_to_time(ms: int, is_vtt: bool = False) -> str:
+    """Formats milliseconds back into subtitle timestamp format."""
+    seconds, milliseconds = divmod(ms, 1000)
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if is_vtt:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+    else:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+
+
 def split_line_semantically(text: str, max_width: int = 40) -> str:
     """Splits a single long line of text into two balanced, grammatically sensible lines."""
     text = text.strip()
@@ -134,7 +156,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None, to_format: str = None) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None, to_format: str = None, fix_overlaps: bool = False) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -156,8 +178,8 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
     if target_vtt and not is_vtt:
         cleaned_blocks.append('WEBVTT')
         
-    expected_index = 1
     arrow_pattern = re.compile(r'(-->|–>|->)')
+    sub_blocks = []
     
     for block in blocks:
         block_stripped = block.strip()
@@ -176,63 +198,94 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             timestamp_line = lines[timestamp_idx]
             text_lines = lines[timestamp_idx+1:]
             
-            # Normalize timestamp line
             arrow_match = arrow_pattern.search(timestamp_line)
             arrow = arrow_match.group(1)
             parts = timestamp_line.split(arrow)
+            
+            start_ms = 0
+            end_ms = 0
             if len(parts) == 2:
-                start_ts = normalize_timestamp(parts[0], target_vtt)
-                end_ts = normalize_timestamp(parts[1], target_vtt)
-                timestamp_line = f"{start_ts} --> {end_ts}"
-            
-            # Correct index sequence
-            if to_format:
-                if target_vtt:
-                    pre_timestamp = []
-                else:
-                    pre_timestamp = [str(expected_index)]
-                    expected_index += 1
-            else:
-                if pre_timestamp:
-                    last_pre = pre_timestamp[-1].strip()
-                    if last_pre.isdigit() or not last_pre:
-                        pre_timestamp[-1] = str(expected_index)
-                        expected_index += 1
-                else:
-                    if not target_vtt:
-                        pre_timestamp = [str(expected_index)]
-                        expected_index += 1
-            
+                start_ts_norm = normalize_timestamp(parts[0], target_vtt)
+                end_ts_norm = normalize_timestamp(parts[1], target_vtt)
+                start_ms = time_to_ms(start_ts_norm)
+                end_ms = time_to_ms(end_ts_norm)
+                
             cleaned_text = clean_text('\n'.join(text_lines), vocab_map=vocab_map)
             
-            if segment or nle == 'premiere':
-                if nle == 'premiere':
-                    max_width = 37
-                else:
-                    max_width = 30 if mobile else 40
-                split_lines = cleaned_text.split('\n')
-                segmented_lines = []
-                for line in split_lines:
-                    if len(line) > max_width:
-                        segmented_lines.append(split_line_semantically(line, max_width))
-                    else:
-                        segmented_lines.append(line)
-                cleaned_text = '\n'.join(segmented_lines)
-            
-            reconstructed_lines = pre_timestamp + [timestamp_line]
-            if cleaned_text:
-                reconstructed_lines.append(cleaned_text)
-            
-            cleaned_blocks.append('\n'.join(reconstructed_lines))
+            sub_blocks.append({
+                'pre_timestamp': pre_timestamp,
+                'start_ms': start_ms,
+                'end_ms': end_ms,
+                'text': cleaned_text,
+                'is_sub': True
+            })
         else:
-            # If target is VTT and source is VTT, preserve metadata
-            if target_vtt and is_vtt:
-                # Skip duplicate WEBVTT prepends
-                if block_stripped == 'WEBVTT' and len(cleaned_blocks) > 0 and cleaned_blocks[0] == 'WEBVTT':
-                    continue
-                cleaned_blocks.append(block)
-            # If target is SRT, skip VTT headers/metadata blocks
+            sub_blocks.append({
+                'text': block,
+                'is_sub': False
+            })
             
+    if fix_overlaps:
+        subs = [b for b in sub_blocks if b['is_sub']]
+        for i in range(len(subs) - 1):
+            curr_b = subs[i]
+            next_b = subs[i+1]
+            if curr_b['end_ms'] > next_b['start_ms']:
+                curr_b['end_ms'] = max(curr_b['start_ms'], next_b['start_ms'] - 1)
+                
+    expected_index = 1
+    for block_data in sub_blocks:
+        if not block_data['is_sub']:
+            block_text = block_data['text'].strip()
+            if target_vtt and is_vtt:
+                if block_text == 'WEBVTT' and len(cleaned_blocks) > 0 and cleaned_blocks[0] == 'WEBVTT':
+                    continue
+                cleaned_blocks.append(block_data['text'])
+            continue
+            
+        start_ts = ms_to_time(block_data['start_ms'], target_vtt)
+        end_ts = ms_to_time(block_data['end_ms'], target_vtt)
+        timestamp_line = f"{start_ts} --> {end_ts}"
+        
+        pre_timestamp = block_data['pre_timestamp']
+        if to_format:
+            if target_vtt:
+                pre_timestamp = []
+            else:
+                pre_timestamp = [str(expected_index)]
+                expected_index += 1
+        else:
+            if pre_timestamp:
+                last_pre = pre_timestamp[-1].strip()
+                if last_pre.isdigit() or not last_pre:
+                    pre_timestamp[-1] = str(expected_index)
+                    expected_index += 1
+            else:
+                if not target_vtt:
+                    pre_timestamp = [str(expected_index)]
+                    expected_index += 1
+                    
+        cleaned_text = block_data['text']
+        if segment or nle == 'premiere':
+            if nle == 'premiere':
+                max_width = 37
+            else:
+                max_width = 30 if mobile else 40
+            split_lines = cleaned_text.split('\n')
+            segmented_lines = []
+            for line in split_lines:
+                if len(line) > max_width:
+                    segmented_lines.append(split_line_semantically(line, max_width))
+                else:
+                    segmented_lines.append(line)
+            cleaned_text = '\n'.join(segmented_lines)
+            
+        reconstructed_lines = pre_timestamp + [timestamp_line]
+        if cleaned_text:
+            reconstructed_lines.append(cleaned_text)
+            
+        cleaned_blocks.append('\n'.join(reconstructed_lines))
+        
     return '\n\n'.join(cleaned_blocks)
 
 def print_preview(original: str, cleaned: str):
@@ -273,6 +326,7 @@ def main():
     parser.add_argument("-v", "--vocab", help="Path to JSON-based vocabulary mapping file for custom search-and-replace corrections.")
     parser.add_argument("--nle", choices=["premiere", "resolve"], help="Optimize output explicitly for Premiere Pro or DaVinci Resolve compatibility.")
     parser.add_argument("-f", "--format", choices=["srt", "vtt"], help="Force output subtitle format conversion (srt or vtt).")
+    parser.add_argument("--fix-overlaps", action="store_true", help="Automatically resolve timing overlaps between adjacent subtitle blocks.")
     
     args = parser.parse_args()
     
@@ -313,7 +367,7 @@ def main():
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                     
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
                 
                 if args.preview:
                     print(f"\n--- Preview: {file_path} ---")
@@ -347,7 +401,7 @@ def main():
                 
             is_sub = "-->" in content or "–>" in content or "->" in content
             if is_sub:
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
             else:
                 cleaned = clean_text(content, vocab_map=vocab_map)
                 
@@ -387,7 +441,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
         else:
             cleaned = clean_text(content, vocab_map=vocab_map)
             
