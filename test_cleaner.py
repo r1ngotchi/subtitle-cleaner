@@ -338,5 +338,31 @@ This subtitle starts too early."""
         self.assertIn("00:00:01,000 --> 00:00:04,499", cleaned_fixed)
         self.assertIn("00:00:04,500 --> 00:00:07,000", cleaned_fixed)
 
+    def test_word_level_splitting(self):
+        srt_input = """1
+00:00:01,000 --> 00:00:04,000
+Hello, world."""
+        expected = """1
+00:00:01,000 --> 00:00:02,500
+Hello,
+
+2
+00:00:02,500 --> 00:00:04,000
+world."""
+        self.assertEqual(clean_subtitle_content(srt_input, word_split=True), expected)
+
+    def test_ass_karaoke_exporter(self):
+        srt_input = """1
+00:00:01,000 --> 00:00:04,000
+Hello, world."""
+        # Check standard ASS export
+        ass_standard = clean_subtitle_content(srt_input, to_format="ass")
+        self.assertIn("[Script Info]", ass_standard)
+        self.assertIn("Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,Hello, world.", ass_standard)
+
+        # Check Karaoke ASS export
+        ass_karaoke = clean_subtitle_content(srt_input, karaoke=True)
+        self.assertIn("Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,{\\k150}Hello, {\\k150}world.", ass_karaoke)
+
 if __name__ == "__main__":
     unittest.main()

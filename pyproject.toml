@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subtitle-cleaner"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
     { name = "r1ngotchi", email = "104.rng@gmail.com" }
 ]

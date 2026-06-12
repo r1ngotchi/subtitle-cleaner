@@ -114,6 +114,27 @@ def ms_to_time(ms: int, is_vtt: bool = False) -> str:
     else:
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
+def ms_to_ass_time(ms: int) -> str:
+    """Formats milliseconds into ASS timing format (H:MM:SS.cs)."""
+    seconds, milliseconds = divmod(ms, 1000)
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    centiseconds = milliseconds // 10
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{centiseconds:02d}"
+
+ASS_HEADER = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"""
+
+
 
 def split_line_semantically(text: str, max_width: int = 40) -> str:
     """Splits a single long line of text into two balanced, grammatically sensible lines."""
@@ -156,7 +177,7 @@ def split_line_semantically(text: str, max_width: int = 40) -> str:
             
     return text[:best_idx].strip() + '\n' + text[best_idx + 1:].strip()
 
-def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None, to_format: str = None, fix_overlaps: bool = False) -> str:
+def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = False, vocab_map: dict = None, nle: str = None, to_format: str = None, fix_overlaps: bool = False, word_split: bool = False, karaoke: bool = False) -> str:
     """Splits file into blocks, detects timing lines, and cleans text, indices, and timestamps."""
     content = content.replace('\r\n', '\n')
     
@@ -170,7 +191,7 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
     content = '\n'.join(lines)
     
     is_vtt = content.strip().startswith('WEBVTT')
-    target_vtt = (to_format.lower() == 'vtt') if to_format else is_vtt
+    target_vtt = (to_format.lower() == 'vtt') if (to_format and to_format.lower() != 'ass') else is_vtt
     
     blocks = content.split('\n\n')
     cleaned_blocks = []
@@ -205,8 +226,8 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             start_ms = 0
             end_ms = 0
             if len(parts) == 2:
-                start_ts_norm = normalize_timestamp(parts[0], target_vtt)
-                end_ts_norm = normalize_timestamp(parts[1], target_vtt)
+                start_ts_norm = normalize_timestamp(parts[0], is_vtt)
+                end_ts_norm = normalize_timestamp(parts[1], is_vtt)
                 start_ms = time_to_ms(start_ts_norm)
                 end_ms = time_to_ms(end_ts_norm)
                 
@@ -233,6 +254,80 @@ def clean_subtitle_content(content: str, segment: bool = False, mobile: bool = F
             if curr_b['end_ms'] > next_b['start_ms']:
                 curr_b['end_ms'] = max(curr_b['start_ms'], next_b['start_ms'] - 1)
                 
+    if word_split:
+        new_sub_blocks = []
+        for block_data in sub_blocks:
+            if not block_data['is_sub'] or not block_data['text'].strip():
+                new_sub_blocks.append(block_data)
+                continue
+            
+            tokens = block_data['text'].split()
+            if not tokens:
+                new_sub_blocks.append(block_data)
+                continue
+                
+            total_len = sum(len(t) for t in tokens)
+            D = block_data['end_ms'] - block_data['start_ms']
+            current_start = block_data['start_ms']
+            
+            for idx, token in enumerate(tokens):
+                if total_len > 0:
+                    token_d = int(D * len(token) / total_len)
+                else:
+                    token_d = int(D / len(tokens))
+                
+                if idx == len(tokens) - 1:
+                    token_end = block_data['end_ms']
+                else:
+                    token_end = current_start + token_d
+                    
+                new_sub_blocks.append({
+                    'pre_timestamp': block_data['pre_timestamp'],
+                    'start_ms': current_start,
+                    'end_ms': token_end,
+                    'text': token,
+                    'is_sub': True
+                })
+                current_start = token_end
+        sub_blocks = new_sub_blocks
+
+    target_ass = (to_format.lower() == 'ass') if to_format else False
+    if karaoke:
+        target_ass = True
+
+    if target_ass:
+        ass_lines = [ASS_HEADER]
+        for block_data in sub_blocks:
+            if not block_data['is_sub']:
+                continue
+            start_ts = ms_to_ass_time(block_data['start_ms'])
+            end_ts = ms_to_ass_time(block_data['end_ms'])
+            
+            if karaoke:
+                tokens = block_data['text'].split()
+                total_len = sum(len(t) for t in tokens)
+                total_cs = (block_data['end_ms'] - block_data['start_ms']) // 10
+                current_cs = 0
+                karaoke_parts = []
+                for idx, token in enumerate(tokens):
+                    if total_len > 0:
+                        token_cs = int(total_cs * len(token) / total_len)
+                    else:
+                        token_cs = int(total_cs / len(tokens))
+                    
+                    if idx == len(tokens) - 1:
+                        token_cs = total_cs - current_cs
+                    
+                    token_cs = max(0, token_cs)
+                    current_cs += token_cs
+                    karaoke_parts.append(f"{{\\k{token_cs}}}{token}")
+                line_text = " ".join(karaoke_parts)
+            else:
+                line_text = block_data['text'].replace('\n', '\\N')
+                
+            ass_lines.append(f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{line_text}")
+        return "\n".join(ass_lines)
+
     expected_index = 1
     for block_data in sub_blocks:
         if not block_data['is_sub']:
@@ -325,8 +420,10 @@ def main():
     parser.add_argument("-m", "--mobile", action="store_true", help="Optimize subtitle line breaking width for mobile/vertical screens (max width: 30 chars).")
     parser.add_argument("-v", "--vocab", help="Path to JSON-based vocabulary mapping file for custom search-and-replace corrections.")
     parser.add_argument("--nle", choices=["premiere", "resolve"], help="Optimize output explicitly for Premiere Pro or DaVinci Resolve compatibility.")
-    parser.add_argument("-f", "--format", choices=["srt", "vtt"], help="Force output subtitle format conversion (srt or vtt).")
+    parser.add_argument("-f", "--format", choices=["srt", "vtt", "ass"], help="Force output subtitle format conversion (srt, vtt, or ass).")
     parser.add_argument("--fix-overlaps", action="store_true", help="Automatically resolve timing overlaps between adjacent subtitle blocks.")
+    parser.add_argument("-w", "--word-split", action="store_true", help="Split subtitle blocks into single-word timed blocks.")
+    parser.add_argument("-k", "--karaoke", action="store_true", help="Export as ASS format with karaoke highlighting.")
     
     args = parser.parse_args()
     
@@ -367,7 +464,7 @@ def main():
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
                     
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps, word_split=args.word_split, karaoke=args.karaoke)
                 
                 if args.preview:
                     print(f"\n--- Preview: {file_path} ---")
@@ -377,13 +474,15 @@ def main():
                 # Determine output path
                 if args.output:
                     rel_path = os.path.relpath(file_path, args.input)
-                    if args.format:
-                        rel_path = os.path.splitext(rel_path)[0] + f".{args.format}"
+                    target_fmt = args.format or ("ass" if args.karaoke else None)
+                    if target_fmt:
+                        rel_path = os.path.splitext(rel_path)[0] + f".{target_fmt}"
                     out_path = os.path.join(args.output, rel_path)
                     os.makedirs(os.path.dirname(out_path), exist_ok=True)
                 else:
                     base, ext = os.path.splitext(file_path)
-                    target_ext = f".{args.format}" if args.format else ext
+                    target_fmt = args.format or ("ass" if args.karaoke else None)
+                    target_ext = f".{target_fmt}" if target_fmt else ext
                     out_path = f"{base}_cleaned{target_ext}"
                     
                 encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
@@ -401,7 +500,7 @@ def main():
                 
             is_sub = "-->" in content or "–>" in content or "->" in content
             if is_sub:
-                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
+                cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps, word_split=args.word_split, karaoke=args.karaoke)
             else:
                 cleaned = clean_text(content, vocab_map=vocab_map)
                 
@@ -412,13 +511,15 @@ def main():
             if args.output:
                 if os.path.isdir(args.output):
                     basename = os.path.basename(args.input)
-                    if args.format:
-                        basename = os.path.splitext(basename)[0] + f".{args.format}"
+                    target_fmt = args.format or ("ass" if args.karaoke else None)
+                    if target_fmt:
+                        basename = os.path.splitext(basename)[0] + f".{target_fmt}"
                     out_path = os.path.join(args.output, basename)
                 else:
                     out_path = args.output
-                    if args.format and not out_path.endswith(f".{args.format}"):
-                        out_path = os.path.splitext(out_path)[0] + f".{args.format}"
+                    target_fmt = args.format or ("ass" if args.karaoke else None)
+                    if target_fmt and not out_path.endswith(f".{target_fmt}"):
+                        out_path = os.path.splitext(out_path)[0] + f".{target_fmt}"
                 encoding = "utf-8-sig" if args.nle == "resolve" else "utf-8"
                 with open(out_path, "w", encoding=encoding) as f:
                     f.write(cleaned)
@@ -429,7 +530,7 @@ def main():
                 print(cleaned)
     else:
         # Fall back to interactive CLI prompt
-        print("=== Subtitle Cleaner v0.2 ===")
+        print("=== Subtitle Cleaner ===")
         print("Paste subtitle text (press Ctrl+D on Unix or Ctrl+Z on Windows + Enter to finish):")
         try:
             content = sys.stdin.read()
@@ -441,7 +542,7 @@ def main():
             
         is_sub = "-->" in content or "–>" in content or "->" in content
         if is_sub:
-            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps)
+            cleaned = clean_subtitle_content(content, segment=args.segment, mobile=args.mobile, vocab_map=vocab_map, nle=args.nle, to_format=args.format, fix_overlaps=args.fix_overlaps, word_split=args.word_split, karaoke=args.karaoke)
         else:
             cleaned = clean_text(content, vocab_map=vocab_map)
             

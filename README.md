@@ -24,7 +24,9 @@ AI transcription tools (Whisper, CapCut, Premiere's auto-transcribe) save time u
 | **Custom vocabulary map** | `--vocab vocab.json` | JSON-based find-and-replace for brand names, jargon, speaker names |
 | **NLE optimization** | `--nle premiere\|resolve` | Premiere Pro (37-char limit, 2-line max) and Resolve (UTF-8 BOM) modes |
 | **Batch processing** | `-i /folder/ -o /out/` | Recursively processes entire directories of `.srt`/`.vtt` files |
-| **Format conversion** | `--format srt\|vtt` / `-f srt\|vtt` | Convert between SRT and VTT formats (converts timestamps & index styles) |
+| **Format conversion** | `--format srt\|vtt\|ass` / `-f srt\|vtt\|ass` | Convert between SRT, VTT, and ASS formats (converts timestamps & styles) |
+| **Word-level splitting** | `--word-split` / `-w` | Splits blocks into single-word timed subtitle blocks (proportionally distributed duration) |
+| **Karaoke style export** | `--karaoke` / `-k` | Exports to ASS format with highlighting `{\k}` centisecond timings |
 | **YouTube caption sync** | `youtube_sync.py` | Downloads, cleans, and saves captions from any YouTube URL |
 
 ---
@@ -72,6 +74,12 @@ subtitle-cleaner -i input.srt -o output.vtt -f vtt
 
 # Convert VTT to SRT (restores sequential indices, normalizes commas)
 subtitle-cleaner -i input.vtt -o output.srt -f srt
+
+# Split subtitles into single-word blocks (e.g. for vertical video captions)
+subtitle-cleaner -i input.srt -o output.srt -w
+
+# Convert to ASS format with karaoke highlighting (for animated captions)
+subtitle-cleaner -i input.srt -o output.ass -k
 
 # Download and clean YouTube captions directly
 subtitle-youtube-sync https://www.youtube.com/watch?v=VIDEO_ID -o output.vtt
@@ -153,7 +161,7 @@ Downloads auto-generated or manually uploaded captions, cleans them, and saves a
 Verify individual module features and parser stability:
 ```bash
 python -m unittest test_cleaner.py
-# Expected: 17 tests, all passing
+# Expected: 19 tests, all passing
 ```
 
 ### Regression Tests
