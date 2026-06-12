@@ -199,6 +199,14 @@ Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
+## ☕ Support & Funding
+
+If `subtitle-cleaner` saves you hours of manual editing, consider supporting the project:
+- **Ko-fi**: [Support r1ngotchi on Ko-fi](https://ko-fi.com/r1ngotchi)
+- **GitHub Sponsors**: [Sponsor r1ngotchi](https://github.com/sponsors/r1ngotchi)
+
+---
+
 ## 📄 License
 
 MIT — free to use, modify, and distribute.

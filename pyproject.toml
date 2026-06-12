@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subtitle-cleaner"
-version = "0.3.0"
+version = "0.3.1"
 authors = [
     { name = "r1ngotchi", email = "104.rng@gmail.com" }
 ]
 description = "A local-first subtitle sanitizer, readability optimizer, and NLE import formatter"
 readme = "README.md"
 requires-python = ">=3.8"
+
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -19,6 +20,10 @@ classifiers = [
 dependencies = [
     "yt-dlp>=2026.3.17",
 ]
+
+[project.urls]
+Homepage = "https://github.com/r1ngotchi/subtitle-cleaner"
+Funding = "https://ko-fi.com/r1ngotchi"
 
 [project.scripts]
 subtitle-cleaner = "cleaner:main"
