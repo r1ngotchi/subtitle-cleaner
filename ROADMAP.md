@@ -49,3 +49,18 @@ AI-generated subtitles save time initially but create massive cleanup debt after
 * [x] YouTube caption download-to-upload pipeline
 * [x] Premiere Pro & DaVinci Resolve import optimization
 * [x] Batch file directory processing
+
+<!-- 📡 GUIDE COMMENT: Stages 1–4 are done. Do NOT invent a Stage 5 of more cleanup features.
+The highest-demand unbuilt items per your own market_research.md AND current 2026 trends are:
+  1. Word-level caption splitting (SRT -> per-word timed blocks) + SRT -> ASS karaoke-style export.
+     ~85% of short-form video is watched muted; animated word-by-word captions are table stakes
+     and competitors charge monthly subscriptions for it. You'd be the free, local-first option.
+  2. Speaker color-coding / speaker-tag splitting (ENTRY 010).
+But FIRST: distribution & revenue. PyPI publish, Reddit execution, money rail.
+Full notes in month1_game/GUIDE_NOTES.md. -->
+
+### Stage 5 — Distribution & Revenue (recommended by GUIDE, not yet started)
+* [ ] PyPI publish + GitHub Actions trusted publishing (releases become operator-free)
+* [ ] Execute Reddit outreach (templates already written in posts/reddit/)
+* [ ] Money rail: GitHub Sponsors / Ko-fi link in README + posts
+* [ ] Word-level caption splitter + ASS karaoke export (first revenue-relevant feature)
