@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "subtitle-cleaner"
-version = "0.3.1"
+version = "0.3.3"
 authors = [
     { name = "r1ngotchi", email = "104.rng@gmail.com" }
 ]
@@ -23,7 +23,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/r1ngotchi/subtitle-cleaner"
-Funding = "https://ko-fi.com/r1ngotchi"
+Funding = "https://github.com/sponsors/r1ngotchi"
 
 [project.scripts]
 subtitle-cleaner = "cleaner:main"
